@@ -3,39 +3,37 @@ import os
 
 sys.path.append(os.path.abspath("src"))
 
-from load_data import load_multiple_datasets
+from load_data import load_single_dataset
 from preprocess import add_rul, clean_and_scale
 from sequence import create_sequences
-from baseline_model import train_and_evaluate
+from baseline_model import train_and_save
 
-# Paths for all datasets
-dataset_paths = [
-    "data/train_FD001.txt",
-    "data/train_FD002.txt",
-    "data/train_FD003.txt",
-    "data/train_FD004.txt"
+os.makedirs("model", exist_ok=True)
+
+datasets = [
+    ("FD001", "data/train_FD001.txt"),
+    ("FD002", "data/train_FD002.txt"),
+    ("FD003", "data/train_FD003.txt"),
+    ("FD004", "data/train_FD004.txt")
 ]
 
-print("Loading all CMAPSS datasets...")
-df = load_multiple_datasets(dataset_paths)
-print("Total records:", df.shape)
+for name, path in datasets:
+    print(f"\n🔹 Training model for {name}")
 
-print("Adding RUL labels...")
-df = add_rul(df)
+    df = load_single_dataset(path)
+    df = add_rul(df)
+    df, sensor_cols = clean_and_scale(df)
 
-print("Cleaning & scaling data...")
-df, sensor_cols = clean_and_scale(df)
+    X, y = create_sequences(df, sensor_cols, window_size=20)
 
-print("Creating sequences...")
-X, y = create_sequences(df, sensor_cols, window_size=20)  
-print("Sequence shape:", X.shape)
+    # Laptop-safe subset
+    X = X[:20000]
+    y = y[:20000]
 
-X = X[:30000]
-y = y[:30000]
-print("Using subset size:", X.shape[0])
+    model_path = f"model/rul_model_{name.lower()}.pkl"
+    rmse = train_and_save(X, y, model_path)
 
-print("Training ML model on combined datasets...")
-rmse = train_and_evaluate(X, y)
+    print(f"✅ {name} training completed | RMSE: {rmse}")
+    print(f"📦 Model saved at: {model_path}")
 
-print("Final RMSE (All datasets):", rmse)
-print("Training completed successfully ✅")
+print("\n🎉 All datasets trained one by one successfully!")
